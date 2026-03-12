@@ -40,7 +40,7 @@ def login_to_hsoa(driver, username, password):
     try:
         driver.get("https://hsoa.ordolms.com/")
         time.sleep(2)
-        username_field = WebDriverWait(driver, 10).until(
+        username_field = WebDriverWait(driver, 20).until(
             EC.presence_of_element_located((By.NAME, "username"))
         )
         username_field.send_keys(username)
@@ -49,42 +49,56 @@ def login_to_hsoa(driver, username, password):
         time.sleep(3)
         return "login" not in driver.current_url.lower()
     except Exception as e:
-        log.error("Login failed: %s", e)
+        log.error("Login failed. Check credentials or site availability. Error: %s", e)
         return False
 
 def change_student_status(driver, student_id, target_status):
     try:
         driver.get("https://hsoa.ordolms.com/home/studentsStatus")
-        time.sleep(3)
+        time.sleep(4) # Give Angular extra time to paint the DOM
 
-        # 1. Input the Student ID
-        search_input = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'input[data-placeholder="Ex. Pedro Perez"]'))
-        )
-        search_input.clear()
-        search_input.send_keys(student_id)
-        time.sleep(2)
+        # 1. Input the Student ID (Using a more flexible CSS selector)
+        try:
+            search_input = WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'input[placeholder*="Pedro"], input[data-placeholder*="Pedro"]'))
+            )
+            search_input.clear()
+            search_input.send_keys(student_id)
+            time.sleep(3) # Wait for the table row to filter
+        except Exception as e:
+            log.error("Could not find the search input box.")
+            raise e
 
         # 2. Click "Change Status"
-        change_status_btn = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, '//span[contains(text(), "Change Status")]'))
-        )
-        driver.execute_script("arguments[0].click();", change_status_btn)
-        time.sleep(1)
+        try:
+            # Looks for the span text or the button containing the text
+            change_status_btn = WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located((By.XPATH, '//span[contains(text(), "Change Status")]/ancestor::button | //button[contains(., "Change Status")]'))
+            )
+            driver.execute_script("arguments[0].click();", change_status_btn)
+            time.sleep(1.5)
+        except Exception as e:
+            log.error("Could not find or click the 'Change Status' button.")
+            raise e
 
         # 3. Select the target status
-        status_xpath = f'//button[contains(@class, "mat-menu-item") and contains(., "{target_status}")]'
-        target_btn = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, status_xpath))
-        )
-        driver.execute_script("arguments[0].click();", target_btn)
-        time.sleep(2)
+        try:
+            status_xpath = f'//button[contains(@class, "mat-menu-item") and contains(., "{target_status}")]'
+            target_btn = WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located((By.XPATH, status_xpath))
+            )
+            driver.execute_script("arguments[0].click();", target_btn)
+            time.sleep(2)
+        except Exception as e:
+            log.error(f"Could not find the dropdown option for '{target_status}'.")
+            raise e
         
         log.info("Successfully changed status to %s for %s", target_status, student_id)
         return True
 
     except Exception as e:
-        log.error("Error updating status for %s: %s", student_id, e)
+        log.error("Fatal error updating status for %s.", student_id)
+        # We don't print the raw 'e' here because the stack trace is messy, our custom logs above will tell us where it died.
         return False
 
 def main():
@@ -107,6 +121,8 @@ def main():
     try:
         if login_to_hsoa(driver, username, password):
             change_student_status(driver, args.student_id, args.status)
+        else:
+            log.error("Aborting script: Could not get past the login screen.")
     finally:
         driver.quit()
 
