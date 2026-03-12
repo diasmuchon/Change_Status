@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Student Status Changer for HS Online Academy.
-Triggered via CLI/GitHub Actions.
+Triggered via GitHub Actions.
 """
 
 import argparse
@@ -21,7 +21,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 
-# Reusing your standard Chrome Setup
 def setup_chrome_driver():
     chrome_options = Options()
     chrome_options.add_argument("--no-sandbox")
@@ -32,7 +31,6 @@ def setup_chrome_driver():
     try:
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
-        driver.implicitly_wait(3)
         return driver
     except Exception as e:
         log.error("Failed to start browser: %s", e)
@@ -42,7 +40,7 @@ def login_to_hsoa(driver, username, password):
     try:
         driver.get("https://hsoa.ordolms.com/")
         time.sleep(2)
-        username_field = WebDriverWait(driver, 5).until(
+        username_field = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.NAME, "username"))
         )
         username_field.send_keys(username)
@@ -56,29 +54,28 @@ def login_to_hsoa(driver, username, password):
 
 def change_student_status(driver, student_id, target_status):
     try:
-        # Navigate directly to the Students Status page
         driver.get("https://hsoa.ordolms.com/home/studentsStatus")
         time.sleep(3)
 
-        # 1. Search for the student
+        # 1. Input the Student ID
         search_input = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'input[data-placeholder*="Pedro"]'))
+            EC.presence_of_element_located((By.CSS_SELECTOR, 'input[data-placeholder="Ex. Pedro Perez"]'))
         )
         search_input.clear()
         search_input.send_keys(student_id)
-        time.sleep(2) # Wait for table to filter
+        time.sleep(2)
 
         # 2. Click "Change Status"
-        change_status_btn = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, '//span[contains(text(), "Change Status")]/parent::button'))
+        change_status_btn = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, '//span[contains(text(), "Change Status")]'))
         )
         driver.execute_script("arguments[0].click();", change_status_btn)
         time.sleep(1)
 
-        # 3. Select the target status from the dropdown
-        # The target_status argument will be one of: "Active", "In-Active", "Graduated", "Dropped"
+        # 3. Select the target status
+        # Maps the CLI argument to the exact text in the dropdown menu
         status_xpath = f'//button[contains(@class, "mat-menu-item") and contains(., "{target_status}")]'
-        target_btn = WebDriverWait(driver, 5).until(
+        target_btn = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, status_xpath))
         )
         driver.execute_script("arguments[0].click();", target_btn)
@@ -101,7 +98,7 @@ def main():
     password = os.environ.get("HSOA_PASSWORD")
 
     if not username or not password:
-        log.error("Missing HSOA credentials in environment.")
+        log.error("Missing credentials.")
         sys.exit(1)
 
     driver = setup_chrome_driver()
@@ -111,8 +108,6 @@ def main():
     try:
         if login_to_hsoa(driver, username, password):
             change_student_status(driver, args.student_id, args.status)
-        else:
-            sys.exit(1)
     finally:
         driver.quit()
 
