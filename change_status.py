@@ -73,7 +73,6 @@ def change_student_status(driver, student_id, target_status):
         time.sleep(1)
 
         # 3. Select the target status
-        # Maps the CLI argument to the exact text in the dropdown menu
         status_xpath = f'//button[contains(@class, "mat-menu-item") and contains(., "{target_status}")]'
         target_btn = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, status_xpath))
@@ -98,7 +97,7 @@ def main():
     password = os.environ.get("HSOA_PASSWORD")
 
     if not username or not password:
-        log.error("Missing credentials.")
+        log.error("Missing HSOA_USERNAME or HSOA_PASSWORD credentials.")
         sys.exit(1)
 
     driver = setup_chrome_driver()
