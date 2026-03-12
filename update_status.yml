@@ -1,0 +1,28 @@
+name: Update Student Status
+
+on:
+  repository_dispatch:
+    types: [update-status-event]
+
+jobs:
+  update-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install selenium webdriver-manager
+
+      - name: Run Status Updater
+        env:
+          HSOA_USERNAME: ${{ secrets.HSOA_USERNAME }}
+          HSOA_PASSWORD: ${{ secrets.HSOA_PASSWORD }}
+        run: |
+          python change_status.py --student-id "${{ github.event.client_payload.student_id }}" --status "${{ github.event.client_payload.status }}"
