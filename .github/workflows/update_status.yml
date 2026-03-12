@@ -1,5 +1,6 @@
 name: Update Student Status
 
+# This allows an external API call (from Google Apps Script) to trigger the workflow
 on:
   repository_dispatch:
     types: [update-status-event]
@@ -18,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install selenium webdriver-manager
+          pip install -r requirements.txt
 
       - name: Debug Payload Data
         run: |
