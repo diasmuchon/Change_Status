@@ -20,6 +20,11 @@ jobs:
         run: |
           pip install selenium webdriver-manager
 
+      - name: Debug Payload Data
+        run: |
+          echo "Received Student ID: '${{ github.event.client_payload.student_id }}'"
+          echo "Received Status: '${{ github.event.client_payload.status }}'"
+
       - name: Run Status Updater
         env:
           HSOA_USERNAME: ${{ secrets.HSOA_USERNAME }}
