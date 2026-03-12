@@ -49,39 +49,46 @@ def login_to_hsoa(driver, username, password):
         time.sleep(3)
         return "login" not in driver.current_url.lower()
     except Exception as e:
-        log.error("Login failed. Check credentials or site availability. Error: %s", e)
+        log.error("Login failed. Check credentials. Error: %s", e)
         return False
 
 def change_student_status(driver, student_id, target_status):
     try:
         driver.get("https://hsoa.ordolms.com/home/studentsStatus")
-        time.sleep(4) # Give Angular extra time to paint the DOM
+        time.sleep(4) 
 
-        # 1. Input the Student ID (Using a more flexible CSS selector)
+        # 0. Optional: explicitly click the tab just in case the URL routing didn't load it
+        try:
+            tab = driver.find_element(By.XPATH, '//div[contains(text(), "Students Status")]')
+            driver.execute_script("arguments[0].click();", tab)
+            time.sleep(1)
+        except:
+            pass # Ignore if already active
+
+        # 1. Input the Student ID using the exact data-placeholder
         try:
             search_input = WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, 'input[placeholder*="Pedro"], input[data-placeholder*="Pedro"]'))
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'input[data-placeholder*="Pedro"]'))
             )
             search_input.clear()
             search_input.send_keys(student_id)
-            time.sleep(3) # Wait for the table row to filter
+            time.sleep(3) # Wait for table filter
         except Exception as e:
-            log.error("Could not find the search input box.")
+            log.error("Failed at Step 1: Could not find the search input box.")
             raise e
 
-        # 2. Click "Change Status"
+        # 2. Click "Change Status" using the specific 'menuStatus' class
         try:
-            # Looks for the span text or the button containing the text
             change_status_btn = WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located((By.XPATH, '//span[contains(text(), "Change Status")]/ancestor::button | //button[contains(., "Change Status")]'))
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'button.menuStatus'))
             )
             driver.execute_script("arguments[0].click();", change_status_btn)
             time.sleep(1.5)
         except Exception as e:
-            log.error("Could not find or click the 'Change Status' button.")
+            log.error("Failed at Step 2: Could not find or click the 'Change Status' button. (Is there a checkbox you normally have to click first?)")
             raise e
 
-        # 3. Select the target status
+        # 3. Select the target status from the dropdown
         try:
             status_xpath = f'//button[contains(@class, "mat-menu-item") and contains(., "{target_status}")]'
             target_btn = WebDriverWait(driver, 20).until(
@@ -90,28 +97,30 @@ def change_student_status(driver, student_id, target_status):
             driver.execute_script("arguments[0].click();", target_btn)
             time.sleep(2)
         except Exception as e:
-            log.error(f"Could not find the dropdown option for '{target_status}'.")
+            log.error(f"Failed at Step 3: Could not find the dropdown option for '{target_status}'.")
             raise e
         
         log.info("Successfully changed status to %s for %s", target_status, student_id)
         return True
 
-    except Exception as e:
+    except Exception:
         log.error("Fatal error updating status for %s.", student_id)
-        # We don't print the raw 'e' here because the stack trace is messy, our custom logs above will tell us where it died.
         return False
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--student-id", required=True)
-    parser.add_argument("--status", required=True, choices=["Active", "In-Active", "Graduated", "Dropped"])
+    # Updated choices based on your HTML snippet
+    parser.add_argument("--status", required=True, choices=[
+        "Active", "In-Active", "Demo", "Graduated", "Schoolarship", "Vacations", "Dropped"
+    ])
     args = parser.parse_args()
 
     username = os.environ.get("HSOA_USERNAME")
     password = os.environ.get("HSOA_PASSWORD")
 
     if not username or not password:
-        log.error("Missing HSOA_USERNAME or HSOA_PASSWORD credentials.")
+        log.error("Missing credentials.")
         sys.exit(1)
 
     driver = setup_chrome_driver()
